@@ -3,7 +3,7 @@ import csv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.layers import Flatten, Dense, Lambda, MaxPooling2D, Convolution2D
+from keras.layers import Flatten, Dense, Lambda, MaxPooling2D, Convolution2D, Cropping2D
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
@@ -60,8 +60,8 @@ ch, row, col = 3, 80, 320  # Trimmed image format
 model = Sequential()
 # Normalizing data
 model.add(Lambda(lambda x: x / 127.5 - 1., input_shape=(ch, row, col), output_shape=(ch, row, col)))
-# # crop images so we only have the important parts (the street)
-# model.add(Cropping2D(cropping=((50, 20), (0, 0))))
+# crop images so we only have the important parts (the street)
+model.add(Cropping2D(cropping=((50, 20), (0, 0))))
 # NVIDIA CNN
 model.add(Convolution2D(24, 5, 5, subsample=(2, 2), activation='relu'))
 model.add(Convolution2D(36, 5, 5, subsample=(2, 2), activation='relu'))

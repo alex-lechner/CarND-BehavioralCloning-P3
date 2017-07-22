@@ -52,14 +52,13 @@ def generator(samples, batch_size=32):
 
 train_generator = generator(train_samples, batch_size=32)
 validation_generator = generator(validation_samples, batch_size=32)
-# ch, row, col = 3, 80, 320  # Trimmed image format
 
 input_shape = (160, 320, 3)
 
 # Model architecture
 model = Sequential()
 # Normalizing data
-model.add(Lambda(lambda x: x / 255.0 - 0.5, input_shape=input_shape, output_shape=input_shape))
+model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape, output_shape=input_shape))
 # crop images so we only have the important parts (the street)
 model.add(Cropping2D(cropping=((50, 20), (0, 0))))
 # NVIDIA CNN
@@ -73,9 +72,9 @@ model.add(Flatten())
 model.add(Dense(100))
 model.add(Dense(50))
 model.add(Dense(10))
+model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
-# model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=2)
 history_obj = model.fit_generator(train_generator, steps_per_epoch=len(train_samples),
                                   validation_data=validation_generator, validation_steps=len(validation_samples),
                                   nb_epoch=3, verbose=1)

@@ -1,12 +1,15 @@
 import csv
 
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.layers import Flatten, Dense, Lambda, MaxPooling2D, Cropping2D, Conv2D
+from keras.layers import Flatten, Dense, Lambda, MaxPooling2D, Cropping2D, Conv2D, Dropout
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+
+matplotlib.use('agg')
 
 lines = []
 with open('./data/driving_log.csv') as file:
@@ -63,14 +66,21 @@ model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape, output_shape
 model.add(Cropping2D(cropping=((50, 20), (0, 0))))
 # NVIDIA CNN
 model.add(Conv2D(24, (5, 5), activation="relu", strides=(2, 2)))
+# model.add(Dropout(0.2)) # -> old model structure loss:0.0083 val_loss:0.0094
 model.add(Conv2D(36, (5, 5), activation="relu", strides=(2, 2)))
+# model.add(Dropout(0.2)) # -> old model structure loss:0.0083 val_loss:0.0094
 model.add(Conv2D(48, (5, 5), activation="relu", strides=(2, 2)))
+# model.add(Dropout(0.2)) # -> old model structure loss:0.0083 val_loss:0.0094
 model.add(Conv2D(64, (3, 3), activation="relu", strides=(2, 2)))
+# model.add(Dropout(0.2)) # -> old model structure loss:0.0083 val_loss:0.0094
 model.add(Conv2D(64, (3, 3), activation="relu", strides=(2, 2), dim_ordering='th'))
 model.add(MaxPooling2D())
+# model.add(Dropout(0.2)) # -> old model structure loss:0.0083 val_loss:0.0094
 model.add(Flatten())
+model.add(Dropout(0.5))
 model.add(Dense(100))
 model.add(Dense(50))
+model.add(Dropout(0.2))
 model.add(Dense(10))
 model.add(Dense(1))
 
@@ -88,4 +98,4 @@ plt.title('Mean squared error loss')
 plt.ylabel('mean squared error')
 plt.xlabel('epoch')
 plt.legend(['training set', 'validation set'], loc='upper right')
-plt.show()
+plt.savefig('model.png')

@@ -7,7 +7,7 @@ matplotlib.use('agg')
 
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.layers import Flatten, Dense, Lambda, Cropping2D, Conv2D, Dropout, MaxPooling2D
+from keras.layers import Flatten, Dense, Lambda, Cropping2D, Conv2D, Dropout, MaxPooling2D, Activation
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
@@ -38,6 +38,7 @@ def generator(samples, batch_size=32):
                     filename = source_path.split('\\')[-1]
                     current_path = './data/IMG/' + filename
                     image = cv2.imread(current_path)
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
                     images.append(image)
                     measurement = float(batch_sample[3])
                     if i == 1:
@@ -55,14 +56,14 @@ def generator(samples, batch_size=32):
                 augmented_images.append(cv2.flip(image, 1))
                 augmented_measurements.append(measurement * -1.0)
 
-            X_train = np.array(augmented_images)
+            x_train = np.array(augmented_images)
             y_train = np.array(augmented_measurements)
-            yield shuffle(X_train, y_train)
+            yield shuffle(x_train, y_train)
 
 
 input_shape = (160, 320, 3)
 BATCH_SIZE = 32
-EPOCHS = 3
+EPOCHS = 9
 
 train_generator = generator(train_samples, batch_size=BATCH_SIZE)
 validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
@@ -78,18 +79,20 @@ model.add(Cropping2D(cropping=((50, 20), (0, 0))))
 model.add(Conv2D(24, (5, 5), activation="relu", strides=(2, 2)))
 model.add(Conv2D(36, (5, 5), activation="relu", strides=(2, 2)))
 model.add(Conv2D(48, (5, 5), activation="relu", strides=(2, 2)))
-model.add(Conv2D(64, (3, 3), activation="relu"))
-model.add(Conv2D(64, (3, 3), activation="relu"))
+model.add(Conv2D(64, (3, 3), activation="relu", strides=(2, 2)))
+model.add(Conv2D(64, (3, 3), activation="relu", strides=(2, 2), data_format="channels_first"))
+model.add(Dropout(0.5))
 model.add(MaxPooling2D())
-model.add(Dropout(0.4))
 
 model.add(Flatten())
 model.add(Dense(100))
-model.add(Dense(50))
-model.add(Dense(10))
+model.add(Activation('relu'))
 model.add(Dropout(0.5))
 
+model.add(Dense(50))
+model.add(Dense(10))
 model.add(Dense(1))
+model.summary()
 
 model.compile(loss='mse', optimizer='adam')
 history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / BATCH_SIZE),

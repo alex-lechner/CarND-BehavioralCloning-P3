@@ -124,7 +124,7 @@ To capture good driving behavior, I first recorded three laps of driving in the 
 
 ![alt text][image2]
 
-I also recorded one lap of driving in the wrong direction on track one using center lane driving to make sure the data is augmented.
+I also recorded one lap of driving in the wrong direction on track one using center lane driving and one lap of driving on track two to make sure there is lots of augmented data.
 
 I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to keep on the center of the lane. These images show what a recovery looks like starting from ... :
 

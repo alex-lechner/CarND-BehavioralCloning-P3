@@ -10,9 +10,10 @@ matplotlib.use('agg')
 
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.layers import Flatten, Dense, Lambda, Cropping2D, Conv2D, Dropout
+from keras.layers import Flatten, Dense, Lambda, Cropping2D, Conv2D, Dropout, MaxPooling2D
 from keras.models import Sequential
 import json
+import matplotlib.image as mpimg
 
 lines = []
 with open('./data/driving_log.csv') as file:
@@ -28,8 +29,7 @@ def generator(samples, batch_size=32):
     while True:
         shuffle(samples)
         for offset in range(0, num_samples, batch_size):
-            end = offset + batch_size
-            batch_samples = samples[offset:end]
+            batch_samples = samples[offset:offset + batch_size]
 
             images, measurements = [], []
             # we do this to use the center camera and the side cameras
@@ -39,7 +39,8 @@ def generator(samples, batch_size=32):
                     # source_path has backslashes because of Windows
                     filename = source_path.split('\\')[-1]
                     current_path = './data/IMG/' + filename
-                    image = cv2.imread(current_path)
+                    # image = cv2.imread(current_path)
+                    image = mpimg.imread(current_path)
                     image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
                     images.append(image)
                     measurement = float(batch_sample[3])
@@ -51,49 +52,32 @@ def generator(samples, batch_size=32):
                         # right camera with correction
                         measurement -= correction
                     measurements.append(measurement)
+                    # augment data
+                    # images.append(np.fliplr(image))
+                    # measurements.append(measurement * -1.0)
 
-            # augment data
-            augmented_images, augmented_measurements = [], []
-            for image, measurement in zip(images, measurements):
-                augmented_images.append(image)
-                augmented_measurements.append(measurement)
-                augmented_images.append(cv2.flip(image, 1))
-                augmented_measurements.append(measurement * -1.0)
-
-            x_train = np.array(augmented_images)
-            y_train = np.array(augmented_measurements)
-
+            x_train = np.array(images)
+            y_train = np.array(measurements)
             yield sklearn.utils.shuffle(x_train, y_train)
 
 
-input_shape = (160, 320, 3)
-BATCH_SIZE = 64
-EPOCHS = 5
-
-train_generator = generator(train_samples, batch_size=BATCH_SIZE)
-validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
-
-
 def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
+    input_shape = (160, 320, 3)
     # Model architecture
     model = Sequential()
     # Normalizing data
-    model.add(Lambda(lambda x: (x / 255.) - 0.5, input_shape=input_shape, output_shape=input_shape))
+    model.add(Lambda(lambda x: (x / 127.) - 1., input_shape=input_shape))
     # crop images so we only have the important parts (the street)
-    model.add(Cropping2D(cropping=((50, 20), (0, 0))))
+    model.add(Cropping2D(cropping=((60, 20), (0, 0))))
 
     # NVIDIA CNN
     model.add(Conv2D(24, (5, 5), activation="relu", strides=(2, 2)))
-    model.add(Dropout(dropout))
     model.add(Conv2D(36, (5, 5), activation="relu", strides=(2, 2)))
-    model.add(Dropout(dropout))
     model.add(Conv2D(48, (5, 5), activation="relu", strides=(2, 2)))
-    model.add(Dropout(dropout))
+    model.add(Conv2D(64, (3, 3), activation="relu"))
     model.add(Conv2D(64, (3, 3), activation="relu"))
     model.add(Dropout(dropout))
-    model.add(Conv2D(64, (3, 3), activation="relu"))
-    model.add(Dropout(dropout))
-
+    model.add(MaxPooling2D())
     model.add(Flatten())
     model.add(Dense(100))
     model.add(Dense(50))
@@ -106,7 +90,7 @@ def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
     history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / batch_size),
                                       validation_data=validation_generator,
                                       validation_steps=int(len(validation_samples) / batch_size),
-                                      epochs=epochs, verbose=1)
+                                      epochs=epochs)
 
     # Save model
     model.save('model.h5')
@@ -127,4 +111,11 @@ def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
     print('Saved visualization data!')
 
 
-nvidia_cnn(dropout=0.3, epochs=EPOCHS, batch_size=BATCH_SIZE)
+BATCH_SIZE = 64
+EPOCHS = 3
+DROPOUT = 0.5
+
+train_generator = generator(train_samples, batch_size=BATCH_SIZE)
+validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
+
+nvidia_cnn(dropout=DROPOUT, epochs=EPOCHS, batch_size=BATCH_SIZE)

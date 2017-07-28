@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from keras.layers import Flatten, Dense, Lambda, Conv2D, Dropout
 from keras.models import Sequential, model_from_json
+from keras.optimizers import Adam
 import json
 import matplotlib.image as mpimg
 
@@ -75,26 +76,39 @@ def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
     model.add(Conv2D(48, (5, 5), activation="relu", strides=(2, 2)))
     model.add(Conv2D(64, (3, 3), activation="relu", data_format="channels_first"))
     model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(Dropout(dropout / 2))
     model.add(Flatten())
-    model.add(Dropout(dropout))
     model.add(Dense(100, activation="relu"))
+    model.add(Dropout(dropout))
     model.add(Dense(50, activation="relu"))
     model.add(Dense(10, activation="relu"))
     model.add(Dense(1))
 
     model.summary()
 
-    model.compile(loss='mse', optimizer='adam')
+    return model
 
-    if Path("model.json").is_file() and Path("model.h5").is_file():
-        model = load_trained_model()
 
-    checkpoint = ModelCheckpoint(filepath='model.h5', save_best_only=True, monitor='val_loss')
-    history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / batch_size),
-                                      validation_data=validation_generator,
-                                      validation_steps=int(len(validation_samples) / batch_size),
-                                      epochs=epochs, callbacks=[checkpoint])
+def preprocess_img(image):
+    # resize to half of the original size (320x160 to 160x80)
+    h, w = image.shape[:2]
+    ratio = (w * 0.5) / w
+    dim = (int(w * 0.5), int(h * ratio))
+    image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+    # crop image to 160x40 (take away 30px from top and 10px from bottom) so we only have the important parts
+    image = image[30:70, 0:160]
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+    return image
 
+
+def load_trained_model(dropout=0.3, epochs=3, batch_size=32):
+    model = nvidia_cnn(dropout=dropout, epochs=epochs, batch_size=batch_size)
+    # load weights into new model
+    model.load_weights("model.h5")
+    return model
+
+
+def save_and_visualize(model, history_obj):
     # Save model
     with open('model.json', 'w') as f:
         json.dump(model.to_json(), f)
@@ -107,34 +121,34 @@ def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
     plt.ylabel('mean squared error')
     plt.xlabel('epoch')
     plt.legend(['training set', 'validation set'], loc='upper right')
-    plt.savefig('model.png')
+    plt.savefig('imgs/model.png')
     print('Saved visualization data!')
 
 
-def preprocess_img(image):
-    # resize to half of the original size (320x160 to 160x80)
-    h, w = image.shape[:2]
-    ratio = (w * 0.5) / w
-    dim = (int(w * 0.5), int(h * ratio))
-    image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
-    # crop image to 160x40 (take away 30px from top and 10px from bottom) so we only have the important parts
-    image = image[30:70, 0:160]
-    return image
+def train_model(dropout=0.3, epochs=3, batch_size=32, learning_rate=0.01):
+    model = nvidia_cnn(dropout=dropout, epochs=epochs, batch_size=batch_size)
 
+    if Path("model.h5").is_file():
+        model = load_trained_model(dropout=dropout, epochs=epochs, batch_size=batch_size)
 
-def load_trained_model():
-    model = model_from_json(open('model.json').read())
-    # load weights into new model
-    model.load_weights("model.h5")
-    model.compile(loss='mse', optimizer='adam')
-    return model
+    model.compile(loss='mse', optimizer=Adam(learning_rate))
+
+    checkpoint = ModelCheckpoint(filepath='model.h5', save_best_only=True, monitor='val_loss')
+    history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / batch_size),
+                                      validation_data=validation_generator,
+                                      validation_steps=int(len(validation_samples) / batch_size),
+                                      epochs=epochs, callbacks=[checkpoint])
+
+    save_and_visualize(model, history_obj)
+
 
 
 BATCH_SIZE = 64
 EPOCHS = 5
 DROPOUT = 0.5
+LEARNING_RATE = 0.0001
 
 train_generator = generator(train_samples, batch_size=BATCH_SIZE)
 validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
 
-nvidia_cnn(dropout=DROPOUT, epochs=EPOCHS, batch_size=BATCH_SIZE)
+train_model(dropout=DROPOUT, epochs=EPOCHS, batch_size=BATCH_SIZE, learning_rate=LEARNING_RATE)

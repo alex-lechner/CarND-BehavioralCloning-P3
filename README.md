@@ -18,10 +18,11 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./imgs/model.png "Model Visualization"
-[image2]: ./img/recovery1.jpg "Recovery Image"
-[image3]: ./img/recovery2.jpg "Recovery Image"
-[image4]: ./img/recovery3.jpg "Recovery Image"
+[image1]: ./imgs/model_first.png "Model Visualization First Run"
+[image2]: ./examples/model_second.png "Model Visualization Second Run"
+[image3]: ./img/recovery1.jpg "Recovery Image"
+[image4]: ./img/recovery2.jpg "Recovery Image"
+[image5]: ./img/recovery3.jpg "Recovery Image"
 [image6]: ./examples/placeholder_small.png "Normal Image"
 [image7]: ./examples/placeholder_small.png "Flipped Image"
 

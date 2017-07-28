@@ -83,7 +83,7 @@ def nvidia_cnn(dropout=0.3):
     model.add(Dense(50, activation="relu"))
     model.add(Dropout(dropout))
     model.add(Dense(10, activation="relu"))
-    model.add(Dense(1, activation="softmax"))
+    model.add(Dense(1))
 
     model.summary()
 

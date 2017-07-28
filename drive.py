@@ -1,20 +1,19 @@
 import argparse
 import base64
-from datetime import datetime
 import os
 import shutil
-
-import numpy as np
-import socketio
-import eventlet
-import eventlet.wsgi
-from PIL import Image
-from flask import Flask
+from datetime import datetime
 from io import BytesIO
 
-from keras.models import load_model
+import cv2
+import eventlet.wsgi
 import h5py
+import numpy as np
+import socketio
+from PIL import Image
+from flask import Flask
 from keras import __version__ as keras_version
+from keras.models import load_model
 
 sio = socketio.Server()
 app = Flask(__name__)
@@ -44,7 +43,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 9
+set_speed = 22
 controller.set_desired(set_speed)
 
 
@@ -61,6 +60,9 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+
+        image_array = image_processing(image_array)
+
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
@@ -77,6 +79,16 @@ def telemetry(sid, data):
         # NOTE: DON'T EDIT THIS.
         sio.emit('manual', data={}, skip_sid=True)
 
+
+def image_processing(image):
+    # processing image like in model.py
+    h, w = image.shape[:2]
+    ratio = (w * 0.5) / w
+    dim = (int(w * 0.5), int(h * ratio))
+    image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+    # crop image to 160x40 (take away 30px from top and 10px from bottom) so we only have the important parts
+    image = image[30:70, 0:160]
+    return image
 
 @sio.on('connect')
 def connect(sid, environ):

@@ -1,19 +1,18 @@
 import csv
 from pathlib import Path
-from random import shuffle
 
 import cv2
 import matplotlib
-import sklearn
 from keras.callbacks import ModelCheckpoint
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
 matplotlib.use('agg')
 
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.layers import Flatten, Dense, Lambda, Conv2D, Dropout
-from keras.models import Sequential, model_from_json
+from keras.models import Sequential
 from keras.optimizers import Adam
 import json
 import matplotlib.image as mpimg
@@ -28,19 +27,17 @@ train_samples, validation_samples = train_test_split(lines, test_size=0.2)
 
 
 def generator(samples, batch_size=32):
-    num_samples = len(samples)
     while True:
         shuffle(samples)
-        for offset in range(0, num_samples, batch_size):
+        for offset in range(0, len(samples), batch_size):
             batch_samples = samples[offset:offset + batch_size]
 
             images, measurements = [], []
             # we do this to use the center camera and the side cameras
             for batch_sample in batch_samples:
                 for i in range(3):
-                    source_path = batch_sample[0]
-                    # source_path has backslashes because of Windows
-                    filename = source_path.split('\\')[-1]
+                    # path has backslashes because of Windows
+                    filename = batch_sample[i].split('\\')[-1]
                     current_path = './data/IMG/' + filename
                     image = mpimg.imread(current_path)
                     image = preprocess_img(image)
@@ -54,35 +51,39 @@ def generator(samples, batch_size=32):
                         # right camera with correction
                         measurement -= correction
                     measurements.append(measurement)
-                    # augment data
-                    images.append(np.fliplr(image))
-                    measurements.append(measurement * -1.0)
+                    if i == 0:
+                        # augment data for center image
+                        images.append(np.fliplr(image))
+                        measurements.append(measurement * -1.0)
 
             x_train = np.array(images)
             y_train = np.array(measurements)
-            yield sklearn.utils.shuffle(x_train, y_train)
+            yield shuffle(x_train, y_train)
 
 
-def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
+def nvidia_cnn(dropout=0.3):
+    """
+    :param dropout: dropout rate
+    :return: Model Architecture (based on NVIDIA paper)
+    """
     input_shape = (40, 160, 3)
-    # Model architecture
-    model = Sequential()
-    # Normalizing data
-    model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=input_shape, output_shape=input_shape))
 
-    # NVIDIA CNN
+    model = Sequential()
+    model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=input_shape, output_shape=input_shape))
     model.add(Conv2D(24, (5, 5), activation="relu", strides=(2, 2)))
     model.add(Conv2D(36, (5, 5), activation="relu", strides=(2, 2)))
+    model.add(Dropout(dropout))
     model.add(Conv2D(48, (5, 5), activation="relu", strides=(2, 2)))
     model.add(Conv2D(64, (3, 3), activation="relu", data_format="channels_first"))
     model.add(Conv2D(64, (3, 3), activation="relu"))
-    model.add(Dropout(dropout / 2))
+    model.add(Dropout(dropout))
     model.add(Flatten())
     model.add(Dense(100, activation="relu"))
     model.add(Dropout(dropout))
     model.add(Dense(50, activation="relu"))
+    model.add(Dropout(dropout))
     model.add(Dense(10, activation="relu"))
-    model.add(Dense(1))
+    model.add(Dense(1, activation="softmax"))
 
     model.summary()
 
@@ -90,6 +91,10 @@ def nvidia_cnn(dropout=0.3, epochs=3, batch_size=32):
 
 
 def preprocess_img(image):
+    """
+    :param image: taken full res image
+    :return: image with shape of (40, 160, 3) and YUV color space
+    """
     # resize to half of the original size (320x160 to 160x80)
     h, w = image.shape[:2]
     ratio = (w * 0.5) / w
@@ -101,8 +106,8 @@ def preprocess_img(image):
     return image
 
 
-def load_trained_model(dropout=0.3, epochs=3, batch_size=32):
-    model = nvidia_cnn(dropout=dropout, epochs=epochs, batch_size=batch_size)
+def load_trained_model(dropout=0.3):
+    model = nvidia_cnn(dropout=dropout)
     # load weights into new model
     model.load_weights("model.h5")
     return model
@@ -126,12 +131,15 @@ def save_and_visualize(model, history_obj):
 
 
 def train_model(dropout=0.3, epochs=3, batch_size=32, learning_rate=0.01):
-    model = nvidia_cnn(dropout=dropout, epochs=epochs, batch_size=batch_size)
+    model = nvidia_cnn(dropout=dropout)
 
     if Path("model.h5").is_file():
-        model = load_trained_model(dropout=dropout, epochs=epochs, batch_size=batch_size)
+        model = load_trained_model(dropout=dropout)
 
     model.compile(loss='mse', optimizer=Adam(learning_rate))
+
+    train_generator = generator(train_samples, batch_size=BATCH_SIZE)
+    validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
 
     checkpoint = ModelCheckpoint(filepath='model.h5', save_best_only=True, monitor='val_loss')
     history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / batch_size),
@@ -142,13 +150,9 @@ def train_model(dropout=0.3, epochs=3, batch_size=32, learning_rate=0.01):
     save_and_visualize(model, history_obj)
 
 
-
 BATCH_SIZE = 64
 EPOCHS = 5
-DROPOUT = 0.5
-LEARNING_RATE = 0.0001
-
-train_generator = generator(train_samples, batch_size=BATCH_SIZE)
-validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
+DROPOUT = 0.3
+LEARNING_RATE = 0.001
 
 train_model(dropout=DROPOUT, epochs=EPOCHS, batch_size=BATCH_SIZE, learning_rate=LEARNING_RATE)

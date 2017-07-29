@@ -3,7 +3,7 @@ from pathlib import Path
 
 import cv2
 import matplotlib
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
@@ -20,6 +20,7 @@ import matplotlib.image as mpimg
 lines = []
 with open('./data/driving_log.csv') as file:
     reader = csv.reader(file)
+    # next(reader) -> only if the first line is unusable
     for line in reader:
         lines.append(line)
 
@@ -51,10 +52,10 @@ def generator(samples, batch_size=32):
                         # right camera with correction
                         measurement -= correction
                     measurements.append(measurement)
-                    if i == 0:
-                        # augment data for center image
-                        images.append(np.fliplr(image))
-                        measurements.append(measurement * -1.0)
+                    # if i == 0:
+                    #     # augment data for center image
+                    #     images.append(np.fliplr(image))
+                    #     measurements.append(measurement * -1.0)
 
             x_train = np.array(images)
             y_train = np.array(measurements)
@@ -130,7 +131,7 @@ def save_and_visualize(model, history_obj):
     print('Saved visualization data!')
 
 
-def train_model(dropout=0.3, epochs=3, batch_size=32, learning_rate=0.01):
+def train_model(dropout, epochs=3, batch_size=32, learning_rate=0.01):
     model = nvidia_cnn(dropout=dropout)
 
     if Path("model.h5").is_file():
@@ -141,17 +142,21 @@ def train_model(dropout=0.3, epochs=3, batch_size=32, learning_rate=0.01):
     train_generator = generator(train_samples, batch_size=BATCH_SIZE)
     validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
 
-    checkpoint = ModelCheckpoint(filepath='model.h5', save_best_only=True, monitor='val_loss')
-    history_obj = model.fit_generator(train_generator, steps_per_epoch=int(len(train_samples) / batch_size),
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=2),
+        ModelCheckpoint(filepath='model.h5', save_best_only=True, monitor='val_loss')
+    ]
+
+    history_obj = model.fit_generator(train_generator, steps_per_epoch=int((len(train_samples) * 3) / batch_size),
                                       validation_data=validation_generator,
-                                      validation_steps=int(len(validation_samples) / batch_size),
-                                      epochs=epochs, callbacks=[checkpoint])
+                                      validation_steps=int((len(validation_samples) * 3) / batch_size),
+                                      epochs=epochs, callbacks=callbacks)
 
     save_and_visualize(model, history_obj)
 
 
 BATCH_SIZE = 64
-EPOCHS = 5
+EPOCHS = 10
 DROPOUT = 0.3
 LEARNING_RATE = 0.001
 

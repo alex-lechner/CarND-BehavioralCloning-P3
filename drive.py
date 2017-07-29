@@ -43,7 +43,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 8
+set_speed = 12
 controller.set_desired(set_speed)
 
 
@@ -88,6 +88,7 @@ def image_processing(image):
     image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
     # crop image to 160x40 (take away 30px from top and 10px from bottom) so we only have the important parts
     image = image[30:70, 0:160]
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
     return image
 
 @sio.on('connect')

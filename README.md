@@ -48,7 +48,7 @@ The model.py file contains the code for training and saving the convolution neur
 
 ![Data Visualization][image8]
 
-Note: This is gif is acclerated and does not match with the actual speed during this recording. The driving speed was set to 14 mph.
+Note: This is gif is accelerated and does not match with the actual speed during this recording. The driving speed was set to 14 mph.
 
 Also look at video.mp4 in this repository for front camera view. The driving speed was set to 12 mph. 
 
